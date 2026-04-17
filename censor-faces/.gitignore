@@ -1,0 +1,16 @@
+# Datasets, weights, training byproducts. Ship code, not artifacts.
+data/
+weights/
+runs/
+*.pt
+*.pth
+*.onnx
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+.ipynb_checkpoints/
+
+# OS
+.DS_Store
