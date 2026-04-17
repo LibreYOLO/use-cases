@@ -1,5 +1,7 @@
 # Blur People. Zero install. 100% MIT.
 
+![Blur people in your webcam](assets/hero.gif)
+
 Real-time privacy filter: detects every person in your webcam feed and blurs them. Runs entirely in your browser.
 
 [![npm](https://img.shields.io/npm/v/libreyolo-web?label=libreyolo-web)](https://www.npmjs.com/package/libreyolo-web)
