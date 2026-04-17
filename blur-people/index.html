@@ -1,0 +1,306 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Blur People - LibreYOLO</title>
+  <link rel="icon" type="image/svg+xml" href="favicon.svg">
+  <meta name="description" content="Real-time webcam people blurring in the browser. Zero install. 100% MIT.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <script>
+    (function () {
+      const stored = localStorage.getItem('theme') || 'light';
+      const isDark = stored === 'dark' || (stored === 'auto' && window.matchMedia('(prefers-color-scheme: dark)').matches);
+      document.documentElement.classList.toggle('dark', isDark);
+      document.documentElement.dataset.theme = stored;
+    })();
+  </script>
+  <style>
+    :root {
+      --color-primary: #0891b2;
+      --color-primary-light: #06b6d4;
+      --color-accent: #10b981;
+      --color-bg: #fafbfd;
+      --color-card: #ffffff;
+      --color-text: #1e293b;
+      --color-muted: #64748b;
+      --color-border: rgba(15, 23, 42, 0.08);
+      --color-grid: rgba(8, 145, 178, 0.07);
+      --shadow-glow: 0 0 0 1px rgba(8, 145, 178, 0.10), 0 30px 60px -25px rgba(8, 145, 178, 0.18);
+      --grid-size: 60px;
+    }
+    html.dark {
+      --color-bg: #020617;
+      --color-card: #0f172a;
+      --color-text: #e2e8f0;
+      --color-muted: #94a3b8;
+      --color-border: rgba(255, 255, 255, 0.08);
+      --color-grid: rgba(6, 182, 212, 0.05);
+      --shadow-glow: 0 0 0 1px rgba(8, 145, 178, 0.10), 0 30px 80px -30px rgba(8, 145, 178, 0.30);
+    }
+    * { box-sizing: border-box; }
+    html, body { margin: 0; padding: 0; }
+    body {
+      min-height: 100vh;
+      background: var(--color-bg);
+      color: var(--color-text);
+      font: 16px/1.55 'Outfit', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background-image:
+        radial-gradient(ellipse 80% 60% at 20% 10%, rgba(8, 145, 178, 0.08), transparent 60%),
+        radial-gradient(ellipse 60% 50% at 80% 90%, rgba(16, 185, 129, 0.05), transparent 60%),
+        linear-gradient(var(--color-grid) 1px, transparent 1px),
+        linear-gradient(90deg, var(--color-grid) 1px, transparent 1px);
+      background-size: auto, auto, var(--grid-size) var(--grid-size), var(--grid-size) var(--grid-size);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      transition: background-color .2s ease, color .2s ease;
+    }
+    a { color: var(--color-primary); text-decoration: none; transition: color .2s ease; }
+    a:hover { color: var(--color-primary-light); }
+
+    .theme-toggle {
+      position: fixed; top: 16px; right: 16px;
+      display: inline-flex; padding: 4px;
+      background: var(--color-card);
+      border: 1px solid var(--color-border);
+      border-radius: 999px;
+      gap: 2px;
+      backdrop-filter: blur(8px);
+      z-index: 10;
+    }
+    .theme-toggle button {
+      appearance: none; background: transparent; border: 0;
+      width: 30px; height: 30px;
+      display: inline-flex; align-items: center; justify-content: center;
+      border-radius: 999px;
+      color: var(--color-muted);
+      cursor: pointer;
+      font-family: inherit;
+      transition: background .15s ease, color .15s ease;
+    }
+    .theme-toggle button:hover { color: var(--color-text); }
+    .theme-toggle button[aria-pressed="true"] {
+      background: linear-gradient(135deg, var(--color-primary), var(--color-primary-light));
+      color: white;
+    }
+    .theme-toggle svg { width: 16px; height: 16px; }
+
+    header { padding: 56px 16px 20px; text-align: center; max-width: 720px; }
+    .badge {
+      display: inline-flex; align-items: center; gap: 6px;
+      background: linear-gradient(135deg, rgba(16, 185, 129, 0.12), rgba(8, 145, 178, 0.12));
+      border: 1px solid rgba(16, 185, 129, 0.30);
+      color: var(--color-accent);
+      padding: 5px 12px;
+      border-radius: 999px;
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: .04em;
+      text-transform: uppercase;
+      margin-bottom: 14px;
+    }
+    .badge::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: var(--color-accent); box-shadow: 0 0 8px var(--color-accent); }
+    h1 { margin: 0 0 8px; font-size: clamp(28px, 5vw, 44px); font-weight: 700; letter-spacing: -.02em; line-height: 1.05; }
+    h1 .accent { background: linear-gradient(135deg, var(--color-primary), var(--color-accent)); -webkit-background-clip: text; background-clip: text; color: transparent; }
+    header p { margin: 0; color: var(--color-muted); font-size: 15px; }
+
+    .stage {
+      position: relative;
+      width: min(720px, 95vw);
+      aspect-ratio: 4 / 3;
+      background: #000;
+      border: 1px solid var(--color-border);
+      border-radius: 14px;
+      overflow: hidden;
+      box-shadow: var(--shadow-glow);
+    }
+    .stage video, .stage canvas { position: absolute; inset: 0; width: 100%; height: 100%; }
+    .stage video { object-fit: cover; visibility: hidden; }
+    .stage canvas { object-fit: cover; }
+
+    #status {
+      margin: 16px 0 4px;
+      padding: 8px 16px;
+      font: 500 13px/1.4 'JetBrains Mono', ui-monospace, monospace;
+      color: var(--color-muted);
+      background: var(--color-card);
+      border: 1px solid var(--color-border);
+      border-radius: 999px;
+      min-width: 260px;
+      display: inline-flex; align-items: center; gap: 8px;
+      font-variant-numeric: tabular-nums;
+    }
+    #status::before {
+      content: ""; width: 8px; height: 8px; border-radius: 50%;
+      background: var(--color-muted);
+      flex-shrink: 0;
+    }
+    #status.loading::before {
+      background: var(--color-primary);
+      box-shadow: 0 0 8px var(--color-primary);
+      animation: pulse 1.4s ease-in-out infinite;
+    }
+    #status.live::before {
+      background: var(--color-accent);
+      box-shadow: 0 0 8px var(--color-accent);
+    }
+    #status.error::before { background: #ef4444; box-shadow: 0 0 8px #ef4444; }
+    #status.live { color: var(--color-text); border-color: rgba(16, 185, 129, 0.30); }
+    #status.error { color: #ef4444; border-color: rgba(239, 68, 68, 0.30); }
+    @keyframes pulse {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: .55; transform: scale(.85); }
+    }
+
+    footer { margin-top: auto; padding: 28px 16px; color: var(--color-muted); font-size: 12px; text-align: center; }
+    footer a { color: var(--color-muted); border-bottom: 1px dotted var(--color-muted); }
+    footer a:hover { color: var(--color-text); border-color: var(--color-text); }
+  </style>
+</head>
+<body>
+  <div class="theme-toggle" role="group" aria-label="Theme">
+    <button data-theme="light" aria-label="Light theme" title="Light">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"/></svg>
+    </button>
+    <button data-theme="dark" aria-label="Dark theme" title="Dark">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+    </button>
+    <button data-theme="auto" aria-label="System theme" title="System">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="13" rx="2"/><path d="M8 21h8M12 17v4"/></svg>
+    </button>
+  </div>
+
+  <header>
+    <span class="badge">Live demo</span>
+    <h1>Blur <span class="accent">people</span> in your webcam</h1>
+    <p>Real-time privacy filter. Runs locally. Powered by <a href="https://github.com/LibreYOLO/libreyolo-web">libreyolo-web</a>.</p>
+  </header>
+
+  <div class="stage">
+    <video id="video" autoplay playsinline muted></video>
+    <canvas id="output"></canvas>
+  </div>
+
+  <div id="status" class="loading">Initializing</div>
+
+  <footer>
+    MIT licensed. <a href="https://github.com/LibreYOLO/use-cases/tree/main/blur-people">Source on GitHub</a>.
+    Part of <a href="https://libreyolo.com">LibreYOLO</a>.
+  </footer>
+
+  <script>
+    (function () {
+      const root = document.documentElement;
+      const buttons = document.querySelectorAll('.theme-toggle button');
+      const apply = (theme) => {
+        const isDark = theme === 'dark' || (theme === 'auto' && window.matchMedia('(prefers-color-scheme: dark)').matches);
+        root.classList.toggle('dark', isDark);
+        root.dataset.theme = theme;
+        localStorage.setItem('theme', theme);
+        buttons.forEach((b) => b.setAttribute('aria-pressed', b.dataset.theme === theme ? 'true' : 'false'));
+      };
+      apply(root.dataset.theme || 'light');
+      buttons.forEach((b) => b.addEventListener('click', () => apply(b.dataset.theme)));
+      window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => {
+        if (root.dataset.theme === 'auto') apply('auto');
+      });
+    })();
+  </script>
+
+  <script type="module">
+    import 'https://esm.sh/onnxruntime-web@1.21.0';
+    import { loadModel } from 'https://esm.sh/libreyolo-web@0.0.5';
+
+    const PERSON_CLASS_ID = 0;
+    const BLUR_RADIUS = 24;
+    const BBOX_PADDING = 0.08;
+
+    const video = document.getElementById('video');
+    const output = document.getElementById('output');
+    const statusEl = document.getElementById('status');
+
+    const setStatus = (msg, state = 'loading') => {
+      statusEl.textContent = msg;
+      statusEl.className = state;
+    };
+
+    setStatus('Requesting camera access');
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
+      video.srcObject = stream;
+      await new Promise((resolve) => { video.onloadedmetadata = resolve; });
+      output.width = video.videoWidth;
+      output.height = video.videoHeight;
+    } catch (err) {
+      setStatus(`Camera blocked: ${err.message}. Allow access and reload.`, 'error');
+      throw err;
+    }
+
+    setStatus('Downloading model (LibreYOLOXn, ~3.6 MB)');
+    const model = await loadModel('LibreYOLOXn', {
+      onProgress: (p) => setStatus(`Downloading model: ${(p * 100).toFixed(0)}%`),
+    });
+
+    setStatus('Warming up inference engine');
+
+    const frameCanvas = new OffscreenCanvas(video.videoWidth, video.videoHeight);
+    const frameCtx = frameCanvas.getContext('2d');
+    const outCtx = output.getContext('2d');
+
+    let lastTime = performance.now();
+    async function loop() {
+      if (video.readyState >= 2 && video.videoWidth > 0) {
+        const w = video.videoWidth;
+        const h = video.videoHeight;
+        if (frameCanvas.width !== w || frameCanvas.height !== h) {
+          frameCanvas.width = w;
+          frameCanvas.height = h;
+          output.width = w;
+          output.height = h;
+        }
+
+        frameCtx.drawImage(video, 0, 0);
+        const result = await model.predict(frameCanvas);
+
+        outCtx.filter = 'none';
+        outCtx.drawImage(frameCanvas, 0, 0);
+
+        const people = result.detections.filter((d) => d.classId === PERSON_CLASS_ID);
+        if (people.length > 0) {
+          outCtx.filter = `blur(${BLUR_RADIUS}px)`;
+          for (const det of people) {
+            const [x1, y1, x2, y2] = det.bbox;
+            const bw = x2 - x1;
+            const bh = y2 - y1;
+            const px = bw * BBOX_PADDING;
+            const py = bh * BBOX_PADDING;
+            const sx = Math.max(0, Math.floor(x1 - px));
+            const sy = Math.max(0, Math.floor(y1 - py));
+            const sw = Math.min(w - sx, Math.ceil(bw + 2 * px));
+            const sh = Math.min(h - sy, Math.ceil(bh + 2 * py));
+            if (sw <= 0 || sh <= 0) continue;
+            outCtx.save();
+            outCtx.beginPath();
+            outCtx.rect(sx, sy, sw, sh);
+            outCtx.clip();
+            outCtx.drawImage(frameCanvas, 0, 0);
+            outCtx.restore();
+          }
+          outCtx.filter = 'none';
+        }
+
+        const now = performance.now();
+        const fps = 1000 / (now - lastTime);
+        lastTime = now;
+        setStatus(`${people.length} people blurred · ${fps.toFixed(0)} FPS · ${model.provider}`, 'live');
+        if (!window.__detectionsReady) window.__detectionsReady = true;
+      }
+      requestAnimationFrame(loop);
+    }
+    loop();
+  </script>
+</body>
+</html>

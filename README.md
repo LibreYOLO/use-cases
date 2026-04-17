@@ -9,6 +9,7 @@ Use cases for the [LibreYOLO](https://github.com/LibreYOLO/libreyolo) family. Ea
 | Use case | What it does | Live demo | Stack |
 |---|---|---|---|
 | [chromium](chromium/) | Webcam object detection in Chrome / Edge | [Open](https://libreyolo.github.io/use-cases/chromium/) | `libreyolo-web` + WebGPU |
+| [blur-people](blur-people/) | Real-time people blurring in the webcam feed | [Open](https://libreyolo.github.io/use-cases/blur-people/) | `libreyolo-web` + canvas blur |
 
 ## Adding a new use case
 
