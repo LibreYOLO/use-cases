@@ -1,0 +1,6 @@
+libreyolo>=1.0.0
+rfdetr==1.4.1   # libreyolo's RF-DETR wrapper imports rfdetr.main, removed after this version
+opencv-python>=4.8.0
+requests>=2.31.0
+tqdm>=4.66.0
+huggingface_hub>=0.24.0
