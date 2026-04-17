@@ -3,12 +3,10 @@
 // record 8 seconds, convert to GIF. Output: assets/hero.gif.
 
 import { spawn, spawnSync } from 'node:child_process';
-import { createWriteStream, existsSync, mkdirSync, renameSync, rmSync } from 'node:fs';
-import { mkdir, readdir } from 'node:fs/promises';
+import { existsSync, mkdirSync, renameSync, rmSync } from 'node:fs';
+import { readdir } from 'node:fs/promises';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { get } from 'node:https';
-import { createHash } from 'node:crypto';
 
 import { chromium } from 'playwright';
 import ffmpegPath from 'ffmpeg-static';
@@ -16,36 +14,25 @@ import ffmpegPath from 'ffmpeg-static';
 const HERE = dirname(fileURLToPath(import.meta.url));
 const ROOT = resolve(HERE, '..');
 const ASSETS = join(ROOT, 'assets');
+const SOURCE_IMG = join(ASSETS, 'demo-source.jpg');
 const SAMPLE = join(ASSETS, '.capture-src.y4m');
 const PORT = 5050;
 const URL = `http://localhost:${PORT}/`;
 const RECORD_MS = 8000;
 
-// Public-domain WebRTC sample, hosted by the WebRTC project. Pinned hash so
-// reproducibility doesn't depend on the upstream remaining stable.
-const SAMPLE_URL = 'https://test-videos.co.uk/vids/bigbuckbunny/y4m/360/Big_Buck_Bunny_360_10s_1MB.y4m';
-const SAMPLE_SHA256 = null; // populate after first download; leave null to skip verification.
-
 mkdirSync(ASSETS, { recursive: true });
 
-async function downloadSample() {
+function generateSample() {
   if (existsSync(SAMPLE)) return;
-  console.log(`Downloading fake-camera source...`);
-  await new Promise((res, rej) => {
-    const file = createWriteStream(SAMPLE);
-    get(SAMPLE_URL, (response) => {
-      if (response.statusCode !== 200) return rej(new Error(`HTTP ${response.statusCode}`));
-      response.pipe(file);
-      file.on('finish', () => file.close(res));
-    }).on('error', rej);
-  });
-  if (SAMPLE_SHA256) {
-    const hash = createHash('sha256');
-    const { readFileSync } = await import('node:fs');
-    hash.update(readFileSync(SAMPLE));
-    const got = hash.digest('hex');
-    if (got !== SAMPLE_SHA256) throw new Error(`Sample checksum mismatch: ${got}`);
-  }
+  if (!existsSync(SOURCE_IMG)) throw new Error(`Missing ${SOURCE_IMG}. Bundled demo image is required.`);
+  console.log('Generating fake-camera y4m from demo image...');
+  // Loop the still image at 12 fps for 6 seconds with a slow ken-burns zoom so the GIF feels alive.
+  // y4m output is uncompressed but small for a 6-second 480p clip, and Chromium's
+  // --use-file-for-fake-video-capture loops it automatically.
+  const filter = "scale=720:720:force_original_aspect_ratio=increase,crop=720:720,zoompan=z='min(zoom+0.0015,1.15)':d=72:s=720x720,fps=12";
+  const args = ['-y', '-loop', '1', '-i', SOURCE_IMG, '-t', '6', '-vf', filter, '-pix_fmt', 'yuv420p', SAMPLE];
+  const r = spawnSync(ffmpegPath, args, { stdio: 'inherit' });
+  if (r.status !== 0) throw new Error('ffmpeg y4m generation failed');
 }
 
 function startServer() {
@@ -69,7 +56,7 @@ async function waitForServer() {
 async function record() {
   console.log('Launching chromium with fake webcam...');
   const browser = await chromium.launch({
-    headless: false,
+    headless: true,
     args: [
       '--use-fake-ui-for-media-stream',
       '--use-fake-device-for-media-stream',
@@ -82,6 +69,8 @@ async function record() {
     permissions: ['camera'],
   });
   const page = await context.newPage();
+  page.on('console', (msg) => console.log(`[browser ${msg.type()}]`, msg.text()));
+  page.on('pageerror', (err) => console.error('[browser error]', err.message));
   await page.goto(URL);
   console.log('Waiting for first detection...');
   await page.waitForFunction(() => window.__detectionsReady === true, { timeout: 60_000 });
@@ -95,19 +84,21 @@ async function record() {
 
 function toGif(webm, gif) {
   console.log('Converting to GIF...');
-  // Two-pass palette for clean colors at small size.
+  // Two-pass palette for clean colors at small size. Trim to 6s, 320px wide,
+  // 10fps, bayer dithering: balances visual quality vs ~2-3 MB target so
+  // GitHub autoplays the GIF in the README.
   const palette = join(ASSETS, '.palette.png');
-  const filtersPalette = 'fps=12,scale=480:-1:flags=lanczos,palettegen';
-  const filtersUse = 'fps=12,scale=480:-1:flags=lanczos[v];[v][p]paletteuse';
-  const r1 = spawnSync(ffmpegPath, ['-y', '-i', webm, '-vf', filtersPalette, palette], { stdio: 'inherit' });
+  const filtersPalette = 'fps=10,scale=320:-1:flags=lanczos,palettegen=stats_mode=diff';
+  const filtersUse = '[0:v]fps=10,scale=320:-1:flags=lanczos[v];[v][1:v]paletteuse=dither=bayer:bayer_scale=5';
+  const r1 = spawnSync(ffmpegPath, ['-y', '-t', '6', '-i', webm, '-vf', filtersPalette, palette], { stdio: 'inherit' });
   if (r1.status !== 0) throw new Error('palettegen failed');
-  const r2 = spawnSync(ffmpegPath, ['-y', '-i', webm, '-i', palette, '-lavfi', filtersUse, gif], { stdio: 'inherit' });
+  const r2 = spawnSync(ffmpegPath, ['-y', '-t', '6', '-i', webm, '-i', palette, '-lavfi', filtersUse, gif], { stdio: 'inherit' });
   if (r2.status !== 0) throw new Error('paletteuse failed');
   rmSync(palette);
 }
 
 async function main() {
-  await downloadSample();
+  generateSample();
   const server = startServer();
   try {
     await waitForServer();
