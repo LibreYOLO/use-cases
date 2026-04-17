@@ -1,0 +1,7 @@
+node_modules/
+out.webm
+.capture-src.y4m
+
+# Keep only the hero GIF in assets/, not byproducts of the capture script.
+assets/*
+!assets/hero.gif

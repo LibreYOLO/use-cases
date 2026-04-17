@@ -1,0 +1,17 @@
+{
+  "name": "libreyolo-use-case-chromium",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Capture tooling for the chromium use case. The demo itself is index.html and needs no install.",
+  "type": "module",
+  "scripts": {
+    "dev": "serve .",
+    "capture": "node scripts/capture.mjs",
+    "postinstall": "playwright install chromium"
+  },
+  "devDependencies": {
+    "ffmpeg-static": "^5.2.0",
+    "playwright": "^1.45.0",
+    "serve": "^14.2.4"
+  }
+}

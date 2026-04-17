@@ -1,0 +1,86 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>YOLO in Chrome - LibreYOLO</title>
+  <style>
+    :root { color-scheme: dark; }
+    body { margin: 0; background: #0a0a0a; color: #f5f5f5; font: 14px/1.4 system-ui, -apple-system, sans-serif; min-height: 100vh; display: flex; flex-direction: column; align-items: center; }
+    header { padding: 20px 16px 12px; text-align: center; }
+    header h1 { margin: 0 0 4px; font-size: 22px; font-weight: 600; }
+    header small { opacity: .65; }
+    header a { color: inherit; }
+    .stage { position: relative; width: min(640px, 95vw); aspect-ratio: 4 / 3; background: #111; border: 1px solid #222; border-radius: 6px; overflow: hidden; }
+    .stage video, .stage canvas { position: absolute; inset: 0; width: 100%; height: 100%; }
+    .stage video { object-fit: cover; }
+    #status { padding: 10px 12px; opacity: .85; min-height: 1em; font-variant-numeric: tabular-nums; }
+    .mit { margin-top: auto; padding: 16px 12px; opacity: .55; font-size: 12px; text-align: center; }
+    .mit a { color: inherit; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>YOLO in Chrome</h1>
+    <small>Zero install. 100% MIT. Powered by <a href="https://github.com/LibreYOLO/libreyolo-web">libreyolo-web</a>.</small>
+  </header>
+  <div class="stage">
+    <video id="video" autoplay playsinline muted></video>
+    <canvas id="overlay"></canvas>
+  </div>
+  <div id="status">Loading model...</div>
+  <footer class="mit">
+    MIT licensed. <a href="https://github.com/LibreYOLO/use-cases/tree/main/chromium">Source</a>.
+  </footer>
+
+  <script type="module">
+    // Explicit peer-dep import so the fetch is visible in DevTools and breaks loudly if esm.sh resolution ever changes.
+    import 'https://esm.sh/onnxruntime-web@1.21.0';
+    import { loadModel, BoxOverlay } from 'https://esm.sh/libreyolo-web@0.0.5';
+
+    const video = document.getElementById('video');
+    const canvas = document.getElementById('overlay');
+    const statusEl = document.getElementById('status');
+
+    const setStatus = (msg) => { statusEl.textContent = msg; };
+
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
+      video.srcObject = stream;
+      await new Promise((resolve) => { video.onloadedmetadata = resolve; });
+      canvas.width = video.videoWidth;
+      canvas.height = video.videoHeight;
+    } catch (err) {
+      setStatus(`Camera error: ${err.message}. Allow camera access and reload.`);
+      throw err;
+    }
+
+    setStatus('Downloading model (LibreYOLOXn, ~3.6 MB)...');
+    const model = await loadModel('LibreYOLOXn', {
+      onProgress: (p) => setStatus(`Downloading model: ${(p * 100).toFixed(0)}%`),
+    });
+
+    const overlay = new BoxOverlay({ canvas, lineWidth: 3, fontSize: 14 });
+
+    setStatus(`Running on ${model.provider}. Show the camera something.`);
+
+    let lastTime = performance.now();
+    async function loop() {
+      if (video.readyState >= 2) {
+        const result = await model.predict(video);
+        overlay.draw(result.detections, {
+          originalWidth: video.videoWidth,
+          originalHeight: video.videoHeight,
+        });
+        const now = performance.now();
+        const fps = 1000 / (now - lastTime);
+        lastTime = now;
+        setStatus(`${result.numDetections} detections · ${fps.toFixed(0)} FPS · ${model.provider}`);
+        if (!window.__detectionsReady) window.__detectionsReady = true;
+      }
+      requestAnimationFrame(loop);
+    }
+    loop();
+  </script>
+</body>
+</html>

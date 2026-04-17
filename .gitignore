@@ -1,0 +1,32 @@
+# Python
+.venv/
+__pycache__/
+*.pyc
+*.pyo
+.ipynb_checkpoints/
+
+# Node
+node_modules/
+
+# Models, datasets, training artifacts (never ship these)
+weights/
+runs/
+widerface/
+widerface-coco/
+*.pt
+*.onnx
+*.pth
+
+# Capture script byproducts
+out.webm
+.capture-src.y4m
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.idea/
+.vscode/
+
+# Per-folder asset rules live in each folder's own .gitignore
