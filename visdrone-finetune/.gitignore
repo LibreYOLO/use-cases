@@ -6,3 +6,11 @@ runs/
 *.pt
 *.pth
 .venv/
+
+# Local-only artifacts (training logs, exports, weights)
+logs/
+export/
+
+# Local-only artifacts
+logs/
+export/

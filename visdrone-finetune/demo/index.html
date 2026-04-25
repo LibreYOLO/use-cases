@@ -1,0 +1,302 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>VisDrone fine-tune — LibreYOLO</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<link rel="icon" href="../favicon.svg" type="image/svg+xml">
+<style>
+  body { font-family: -apple-system, system-ui, sans-serif; background: #0e0f12; color: #d8dde6; margin: 0; padding: 24px; }
+  h1 { margin: 0 0 4px 0; font-weight: 600; }
+  .sub { color: #8c93a0; margin-bottom: 24px; font-size: 0.95em; }
+  .stack { display: flex; flex-direction: column; gap: 16px; max-width: 1024px; }
+  .canvas-wrap { background: #161821; border: 1px solid #232634; border-radius: 8px; padding: 8px; position: relative; }
+  canvas { display: block; max-width: 100%; height: auto; border-radius: 4px; }
+  .row { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; }
+  button, input[type=file] { background: #2a2f3d; color: #e6eaf2; border: 1px solid #383d4e; border-radius: 6px; padding: 8px 14px; font-size: 0.95em; cursor: pointer; }
+  button:disabled { opacity: 0.5; cursor: not-allowed; }
+  button.primary { background: #3b82f6; border-color: #3b82f6; color: white; }
+  .status { font-size: 0.9em; color: #8c93a0; }
+  .status.err { color: #ef4444; }
+  .status.ok { color: #10b981; }
+  details { background: #161821; border: 1px solid #232634; border-radius: 8px; padding: 12px 16px; }
+  details summary { cursor: pointer; user-select: none; }
+  pre { background: #0a0c10; padding: 12px; border-radius: 6px; overflow-x: auto; font-size: 0.85em; }
+  .legend { display: flex; flex-wrap: wrap; gap: 8px; font-size: 0.85em; }
+  .legend span { padding: 2px 8px; border-radius: 4px; color: white; }
+  a { color: #60a5fa; }
+  .preview-banner { background: #422006; border: 1px solid #92400e; color: #fcd34d; padding: 10px 14px; border-radius: 8px; font-size: 0.9em; }
+</style>
+</head>
+<body>
+<div class="stack">
+  <div>
+    <h1>VisDrone aerial-imagery detection</h1>
+    <div class="sub">
+      Open an aerial photo or use your webcam. Detections run locally in your browser via
+      ONNX Runtime Web — no upload, no server. Model: <code>LibreYOLO/visdrone-yolo9s</code>
+      pulled from the HuggingFace Hub on first visit and cached.
+      Built on <a href="https://github.com/LibreYOLO/libreyolo" target="_blank">LibreYOLO</a>.
+    </div>
+  </div>
+
+  <div class="preview-banner" id="preview-banner" hidden>
+    ⚠️ Preview weights — trained briefly on Apple Metal. Detections will be coarse;
+    for production accuracy a full GPU run is needed. See the
+    <a href="https://huggingface.co/LibreYOLO/visdrone-yolo9s" target="_blank">model card</a>.
+  </div>
+
+  <div class="row">
+    <button id="btn-load" class="primary">Load model (first visit downloads ~30 MB)</button>
+    <input type="file" id="file" accept="image/*" disabled>
+    <button id="btn-cam" disabled>Use webcam</button>
+    <span class="status" id="status">Click "Load model" to start.</span>
+  </div>
+
+  <div class="canvas-wrap">
+    <canvas id="canvas" width="640" height="480"></canvas>
+  </div>
+
+  <div class="legend" id="legend"></div>
+
+  <details>
+    <summary>What this is</summary>
+    <p>
+      A self-contained browser demo of <a href="https://github.com/LibreYOLO/use-cases/tree/main/visdrone-finetune"
+      target="_blank">LibreYOLO/use-cases/visdrone-finetune</a>. Detects 10 VisDrone
+      classes (pedestrian, people, bicycle, car, van, truck, tricycle, awning-tricycle,
+      bus, motor) on aerial / drone imagery.
+    </p>
+    <p>
+      The ONNX file (<code>visdrone.onnx</code>, ~30 MB) is fetched from
+      <a href="https://huggingface.co/LibreYOLO/visdrone-yolo9s" target="_blank">
+      <code>LibreYOLO/visdrone-yolo9s</code></a> on first visit and cached by the
+      browser. Inference runs through <a href="https://onnxruntime.ai/docs/tutorials/web/" target="_blank">
+      onnxruntime-web</a> with the WebGPU backend if available, falling back to WASM.
+    </p>
+    <p>
+      Reproduce locally:
+      <code>git clone https://github.com/LibreYOLO/use-cases &amp;&amp; cd use-cases/visdrone-finetune
+      &amp;&amp; pip install -r requirements.txt &amp;&amp; python -m src.train</code>
+    </p>
+  </details>
+</div>
+
+<script type="module">
+  import * as ort from "https://cdn.jsdelivr.net/npm/onnxruntime-web@1.18.0/dist/ort.webgpu.min.mjs";
+
+  const CLASSES = [
+    "pedestrian","people","bicycle","car","van",
+    "truck","tricycle","awning-tricycle","bus","motor",
+  ];
+  const PALETTE = [
+    "#ef4444","#f59e0b","#eab308","#10b981","#06b6d4",
+    "#3b82f6","#8b5cf6","#ec4899","#f97316","#84cc16",
+  ];
+  // Preview repo on the contributor's namespace; maintainers can mirror to
+  // LibreYOLO/visdrone-yolo9 once the PR is reviewed and the weights get
+  // hosted under the org. Override at runtime via `?repo=org/name` in the URL.
+  const HF_REPO = new URLSearchParams(location.search).get("repo") || "ander2221/visdrone-yolo9-preview";
+  const ONNX_URL = `https://huggingface.co/${HF_REPO}/resolve/main/visdrone.onnx`;
+  const IMGSZ = 384;
+  const CONF_THR = 0.20;
+  const IOU_THR = 0.45;
+
+  const els = {
+    btnLoad: document.getElementById("btn-load"),
+    btnCam: document.getElementById("btn-cam"),
+    file: document.getElementById("file"),
+    canvas: document.getElementById("canvas"),
+    status: document.getElementById("status"),
+    legend: document.getElementById("legend"),
+    banner: document.getElementById("preview-banner"),
+  };
+  const ctx = els.canvas.getContext("2d");
+
+  const setStatus = (msg, cls = "") => { els.status.textContent = msg; els.status.className = "status " + cls; };
+  const populateLegend = () => {
+    els.legend.innerHTML = CLASSES.map((c, i) =>
+      `<span style="background:${PALETTE[i]}">${c}</span>`).join("");
+  };
+  populateLegend();
+  els.banner.hidden = false;
+
+  let session = null;
+  els.btnLoad.addEventListener("click", async () => {
+    els.btnLoad.disabled = true;
+    setStatus(`Downloading model from ${HF_REPO} (cached after first visit)…`);
+    try {
+      session = await ort.InferenceSession.create(ONNX_URL, {
+        executionProviders: ["webgpu", "wasm"],
+        graphOptimizationLevel: "all",
+      });
+      els.file.disabled = false;
+      els.btnCam.disabled = false;
+      setStatus("Model loaded. Pick an image or click 'Use webcam'.", "ok");
+    } catch (e) {
+      console.error(e);
+      setStatus("Model load failed: " + e.message, "err");
+      els.btnLoad.disabled = false;
+    }
+  });
+
+  els.file.addEventListener("change", async (e) => {
+    if (!session || !e.target.files[0]) return;
+    const url = URL.createObjectURL(e.target.files[0]);
+    const img = new Image();
+    img.onload = () => runOnImage(img);
+    img.src = url;
+  });
+
+  let camStream = null;
+  els.btnCam.addEventListener("click", async () => {
+    if (camStream) {
+      camStream.getTracks().forEach(t => t.stop());
+      camStream = null;
+      els.btnCam.textContent = "Use webcam";
+      return;
+    }
+    try {
+      camStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } });
+      const v = document.createElement("video");
+      v.srcObject = camStream;
+      await v.play();
+      els.btnCam.textContent = "Stop webcam";
+      const loop = async () => {
+        if (!camStream) return;
+        await runOnImage(v);
+        requestAnimationFrame(loop);
+      };
+      loop();
+    } catch (e) {
+      setStatus("Webcam unavailable: " + e.message, "err");
+    }
+  });
+
+  function letterbox(srcCanvas, target) {
+    const ratio = Math.min(target / srcCanvas.height, target / srcCanvas.width);
+    const newW = Math.round(srcCanvas.width * ratio);
+    const newH = Math.round(srcCanvas.height * ratio);
+    const padX = Math.floor((target - newW) / 2);
+    const padY = Math.floor((target - newH) / 2);
+    const out = document.createElement("canvas");
+    out.width = target; out.height = target;
+    const c = out.getContext("2d");
+    c.fillStyle = "rgb(114,114,114)";
+    c.fillRect(0, 0, target, target);
+    c.drawImage(srcCanvas, padX, padY, newW, newH);
+    return { canvas: out, ratio, padX, padY };
+  }
+
+  function imageDataToCHW(imageData) {
+    const { data, width, height } = imageData;
+    const out = new Float32Array(3 * width * height);
+    for (let i = 0; i < width * height; i++) {
+      out[i] = data[i * 4] / 255;
+      out[i + width * height] = data[i * 4 + 1] / 255;
+      out[i + 2 * width * height] = data[i * 4 + 2] / 255;
+    }
+    return out;
+  }
+
+  function softmax1D(arr) {
+    let m = -Infinity;
+    for (const v of arr) if (v > m) m = v;
+    let s = 0;
+    const out = new Float32Array(arr.length);
+    for (let i = 0; i < arr.length; i++) { out[i] = Math.exp(arr[i] - m); s += out[i]; }
+    for (let i = 0; i < arr.length; i++) out[i] /= s;
+    return out;
+  }
+
+  function nms(boxes, scores, classes, iouThr) {
+    const idxs = scores.map((s, i) => [s, i]).sort((a, b) => b[0] - a[0]).map(x => x[1]);
+    const keep = [];
+    while (idxs.length > 0) {
+      const i = idxs.shift();
+      keep.push(i);
+      for (let j = idxs.length - 1; j >= 0; j--) {
+        const k = idxs[j];
+        if (iou(boxes[i], boxes[k]) > iouThr) idxs.splice(j, 1);
+      }
+    }
+    return keep;
+  }
+  function iou(a, b) {
+    const x1 = Math.max(a[0], b[0]), y1 = Math.max(a[1], b[1]);
+    const x2 = Math.min(a[2], b[2]), y2 = Math.min(a[3], b[3]);
+    const inter = Math.max(0, x2 - x1) * Math.max(0, y2 - y1);
+    const area_a = (a[2] - a[0]) * (a[3] - a[1]);
+    const area_b = (b[2] - b[0]) * (b[3] - b[1]);
+    return inter / (area_a + area_b - inter + 1e-9);
+  }
+
+  async function runOnImage(img) {
+    const W = img.naturalWidth || img.videoWidth || img.width;
+    const H = img.naturalHeight || img.videoHeight || img.height;
+    const src = document.createElement("canvas");
+    src.width = W; src.height = H;
+    src.getContext("2d").drawImage(img, 0, 0);
+
+    const { canvas: lb, ratio, padX, padY } = letterbox(src, IMGSZ);
+    const lbCtx = lb.getContext("2d");
+    const lbData = lbCtx.getImageData(0, 0, IMGSZ, IMGSZ);
+    const chw = imageDataToCHW(lbData);
+
+    const t0 = performance.now();
+    const tensor = new ort.Tensor("float32", chw, [1, 3, IMGSZ, IMGSZ]);
+    const outputs = await session.run({ images: tensor });
+
+    // libreyolo ONNX export: output shape (B, 4+nc, N) — channels-first per anchor.
+    // For VisDrone (10 classes, imgsz=384): (1, 14, 3024) where N = 48*48 + 24*24 + 12*12.
+    const out = outputs.output || outputs[Object.keys(outputs)[0]];
+    const data = out.data;
+    const dims = out.dims;
+    if (dims.length !== 3 || dims[0] !== 1 || dims[1] !== 4 + CLASSES.length) {
+      setStatus(`Unexpected ONNX output shape: ${dims.join("x")} (expected 1×${4 + CLASSES.length}×N)`, "err");
+      return;
+    }
+    const N = dims[2];
+
+    const boxes = [], confs = [], cls = [];
+    for (let i = 0; i < N; i++) {
+      const cx = data[i], cy = data[N + i], w = data[2 * N + i], h = data[3 * N + i];
+      let bestC = 0, bestS = -Infinity;
+      for (let c = 0; c < CLASSES.length; c++) {
+        const s = data[(4 + c) * N + i];
+        if (s > bestS) { bestS = s; bestC = c; }
+      }
+      const conf = 1 / (1 + Math.exp(-bestS)); // sigmoid
+      if (conf < CONF_THR) continue;
+      const x1 = (cx - w / 2 - padX) / ratio;
+      const y1 = (cy - h / 2 - padY) / ratio;
+      const x2 = (cx + w / 2 - padX) / ratio;
+      const y2 = (cy + h / 2 - padY) / ratio;
+      boxes.push([Math.max(0, x1), Math.max(0, y1), Math.min(W, x2), Math.min(H, y2)]);
+      confs.push(conf);
+      cls.push(bestC);
+    }
+    const keep = nms(boxes, confs, cls, IOU_THR);
+
+    els.canvas.width = W; els.canvas.height = H;
+    ctx.drawImage(src, 0, 0);
+    ctx.font = "16px -apple-system, sans-serif";
+    ctx.lineWidth = 3;
+    for (const i of keep) {
+      const [x1, y1, x2, y2] = boxes[i];
+      const color = PALETTE[cls[i]];
+      ctx.strokeStyle = color;
+      ctx.fillStyle = color;
+      ctx.strokeRect(x1, y1, x2 - x1, y2 - y1);
+      const label = `${CLASSES[cls[i]]} ${confs[i].toFixed(2)}`;
+      const tw = ctx.measureText(label).width + 8;
+      ctx.fillRect(x1, Math.max(0, y1 - 22), tw, 22);
+      ctx.fillStyle = "white";
+      ctx.fillText(label, x1 + 4, Math.max(16, y1 - 6));
+    }
+    const ms = (performance.now() - t0).toFixed(0);
+    setStatus(`${keep.length} detections in ${ms} ms`, "ok");
+  }
+</script>
+</body>
+</html>

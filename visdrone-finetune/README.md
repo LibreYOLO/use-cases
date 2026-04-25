@@ -8,11 +8,45 @@ Fine-tune LibreYOLO9 on the [VisDrone2019-DET](http://aiskyeye.com/) aerial-imag
 
 ## Path 1: use it in the browser (zero install)
 
-**Not yet available.** Needs ONNX-exported weights on HuggingFace. Planned once we have a finished VisDrone checkpoint to host. See [path 3](#path-3-build-it-under-an-hour) in the meantime.
+**Live (preview):** open [`demo/index.html`](./demo/index.html) in Chrome,
+allow the camera or pick an aerial photo, and detections are drawn in real
+time. The 8 MB ONNX is fetched from the HuggingFace Hub
+([`ander2221/visdrone-yolo9-preview`](https://huggingface.co/ander2221/visdrone-yolo9-preview))
+on first visit and cached. Inference runs entirely in your browser via
+[onnxruntime-web](https://onnxruntime.ai/docs/tutorials/web/) (WebGPU →
+WASM fallback).
 
-## Path 2: use it in Python (once weights exist)
+> **Status: preview (v0.1).** These are MIT-licensed weights trained for
+> only **5 epochs on Apple Metal Performance Shaders** (M-series GPU) at
+> imgsz=384. Detections are real (cars, buses, pedestrians visible on
+> aerial photos at conf 0.2-0.6) but coarse — production accuracy
+> needs ~50 epochs on a GPU. Fine to demo the pipeline, not for
+> downstream products. See model card for details.
 
-Once a `LibreYOLO/visdrone-yolo9s` HF repo is published, this will be the one-liner. For now, train your own (path 3) and use `src.infer` with your local checkpoint:
+To point the demo at a different model (e.g. once a fully-trained
+upstream-hosted version exists), append `?repo=org/repo-name` to the URL.
+
+## Path 2: use it in Python
+
+Run the same preview weights from any Python process:
+
+```bash
+pip install -r requirements.txt
+
+python -c "
+from huggingface_hub import hf_hub_download
+from src.load_finetuned import load_visdrone_model
+
+ckpt = hf_hub_download('ander2221/visdrone-yolo9-preview', 'visdrone.pt')
+# Optional: also pulls the COCO-pretrained backbone needed to match the
+# fine-tune's hybrid head architecture (see load_finetuned.py docstring).
+model = load_visdrone_model(ckpt)
+result = model('aerial.jpg')
+print(result.boxes)
+"
+```
+
+Or for any local checkpoint trained yourself (path 3):
 
 ```bash
 pip install -r requirements.txt

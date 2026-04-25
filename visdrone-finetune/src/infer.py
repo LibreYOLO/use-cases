@@ -51,7 +51,8 @@ def main() -> int:
         print(f"missing {args.source}", file=sys.stderr)
         return 1
 
-    model = LibreYOLO(str(args.weights), device=args.device)
+    from .load_finetuned import load_visdrone_model
+    model = load_visdrone_model(args.weights, device=args.device)
     is_video = args.source.suffix.lower() in (".mp4", ".avi", ".mkv", ".mov", ".webm")
     out = args.out or args.source.with_suffix(f".detected{args.source.suffix}")
     out.parent.mkdir(parents=True, exist_ok=True)
