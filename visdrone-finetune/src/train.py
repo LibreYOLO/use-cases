@@ -50,8 +50,10 @@ def main() -> int:
 
     print(f"device: {args.device}")
     print(f"loading {args.model} (auto-downloads COCO-pretrained weights on first run)")
-    # nb_classes=10: VisDrone's 10 useful classes (category 0 and 11 dropped).
-    model = LibreYOLO9(args.model, size=args.size, nb_classes=10, device=args.device)
+    # Load with the checkpoint's class count (80 for COCO-pretrained); the
+    # trainer auto-rebuilds the head for VisDrone's 10 classes when it reads
+    # data.yaml's `nc: 10`.
+    model = LibreYOLO9(args.model, size=args.size, device=args.device)
 
     print(f"training: {args.epochs} epochs, batch {args.batch}, imgsz {args.imgsz}, lr0={args.lr0}")
     results = model.train(
