@@ -20,6 +20,7 @@ from __future__ import annotations
 
 import queue
 import subprocess
+import sys
 import threading
 import time
 import tkinter as tk
@@ -49,20 +50,47 @@ CAPTION = "I SEE YOU"
 SOUND_FILE = ROOT / "sounds" / "catch.wav"
 
 
+def _popen_silent(cmd):
+    subprocess.Popen(
+        cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+    )
+
+
 def play_sound():
-    """Play the catch sound without blocking. macOS only (afplay)."""
+    """Play the catch sound without blocking. Cross-platform, best-effort.
+
+    macOS uses ``afplay``, Windows uses the stdlib ``winsound`` module, and
+    Linux tries the usual CLI players (``paplay``/``aplay``/``ffplay``). If the
+    .wav is missing or no player is available it falls back to a system sound /
+    beep, and silently does nothing if even that fails — audio is never allowed
+    to crash the overlay.
+    """
+    have_file = SOUND_FILE.exists()
     try:
-        if SOUND_FILE.exists():
-            subprocess.Popen(
-                ["afplay", str(SOUND_FILE)],
-                stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
-            )
-        else:
-            # Fallback: built-in system sound so you still get feedback.
-            subprocess.Popen(
-                ["afplay", "/System/Library/Sounds/Glass.aiff"],
-                stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
-            )
+        if sys.platform == "darwin":
+            src = str(SOUND_FILE) if have_file else "/System/Library/Sounds/Glass.aiff"
+            _popen_silent(["afplay", src])
+        elif sys.platform == "win32":
+            import winsound
+
+            if have_file:
+                winsound.PlaySound(
+                    str(SOUND_FILE),
+                    winsound.SND_FILENAME | winsound.SND_ASYNC,
+                )
+            else:
+                winsound.MessageBeep()
+        else:  # Linux / other POSIX
+            if not have_file:
+                # No bundled file and no portable system sound — best-effort beep.
+                _popen_silent(["printf", "\a"])
+                return
+            for player in (["paplay"], ["aplay", "-q"], ["ffplay", "-nodisp", "-autoexit", "-loglevel", "quiet"]):
+                try:
+                    _popen_silent(player + [str(SOUND_FILE)])
+                    return
+                except FileNotFoundError:
+                    continue
     except Exception:
         pass
 

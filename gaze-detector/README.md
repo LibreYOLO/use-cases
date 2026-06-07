@@ -41,8 +41,8 @@ If Google Drive throttles the download (it rate-limits popular files), grab `L2C
 
 - **Sensitivity** — widen or narrow `YAW_THRESHOLD_DEG` / `PITCH_THRESHOLD_DEG` in `src/common.py`. Run `src.gaze_console` and read off the angles at which *you* count as "looking."
 - **CPU** — `INFER_EVERY` runs gaze every Nth frame. Bump it on slower machines. The model loads on `cpu` by default; pass `device="mps"`/`"cuda"` in `load_model` if you have it.
-- **The catch sound** — drop any short `.wav` at `sounds/catch.wav` (one is included). Missing file falls back to a macOS system sound.
-- **The overlay** is macOS-tuned (`afplay` for sound; a borderless screen-sized window instead of `-fullscreen` to avoid spawning a new Space). The vision pipeline is cross-platform; the Tk overlay specifics may need tweaking on Linux/Windows.
+- **The catch sound** — drop any short `.wav` at `sounds/catch.wav` (one is included). Playback is cross-platform best-effort: `afplay` on macOS, `winsound` on Windows, `paplay`/`aplay`/`ffplay` on Linux. A missing file or absent player falls back to a system sound / beep, and never crashes the overlay.
+- **The overlay window** is macOS-tuned (a borderless screen-sized window instead of `-fullscreen` to avoid spawning a new Space). The vision pipeline and sound are cross-platform; the Tk window specifics may still need tweaking on Linux/Windows.
 
 ### `bait/`
 
