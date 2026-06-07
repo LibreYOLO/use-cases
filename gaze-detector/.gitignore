@@ -1,0 +1,10 @@
+__pycache__/
+*.pyc
+.venv/
+
+# L2CS Gaze360 weights — never committed. The Gaze360 dataset license forbids
+# redistributing models trained on it; they auto-download on first run.
+weights/
+*.pt
+*.pth
+*.pkl
