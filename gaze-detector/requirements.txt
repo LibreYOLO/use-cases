@@ -1,0 +1,10 @@
+# Gaze estimation. The [gaze] extra pulls in gdown so the Gaze360 L2CS
+# checkpoint can auto-download from Google Drive on first run.
+libreyolo[gaze]>=1.0.0
+
+# Vision + UI.
+opencv-python>=4.8.0
+Pillow>=10.0.0
+numpy>=1.26.0
+torch>=2.0.0
+# tkinter ships with CPython on macOS/Windows; on Linux: apt install python3-tk

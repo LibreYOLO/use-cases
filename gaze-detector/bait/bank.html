@@ -1,0 +1,362 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>Banco Aurora — Banca Online</title>
+<style>
+  :root {
+    --bg: #f3f5f9;
+    --panel: #ffffff;
+    --panel-hi: #f7f9fc;
+    --border: #e3e8f0;
+    --ink: #0b1f3a;
+    --text: #16243a;
+    --muted: #6b7689;
+    --brand: #072146;        /* deep navy */
+    --brand-2: #1464ff;      /* cobalt */
+    --accent: #0aa06e;       /* green for income */
+    --bad: #d6435b;
+    --chip: #eef3fb;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body {
+    height: 100%; width: 100%;
+    background: var(--bg); color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Inter", "Helvetica Neue", system-ui, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    overflow: hidden;
+  }
+  .app { display: grid; grid-template-columns: 256px 1fr; height: 100vh; }
+
+  /* Sidebar */
+  .side {
+    background: var(--brand);
+    color: #dfe8f7;
+    padding: 22px 16px;
+    display: flex; flex-direction: column; gap: 4px;
+  }
+  .logo {
+    display: flex; align-items: center; gap: 12px;
+    margin: 6px 10px 30px; font-weight: 700; font-size: 19px; color: #fff;
+    letter-spacing: -0.01em;
+  }
+  .logo .mark {
+    width: 34px; height: 34px; flex: none;
+  }
+  .logo small { display:block; font-size:10px; font-weight:500; color:#8fb0e6; letter-spacing:0.16em; }
+  .nav a {
+    display: flex; align-items: center; gap: 12px;
+    padding: 11px 12px; border-radius: 10px;
+    color: #b9cae6; text-decoration: none; font-size: 14px; font-weight: 500;
+  }
+  .nav a.active { background: rgba(255,255,255,0.12); color: #fff; }
+  .nav a:hover { background: rgba(255,255,255,0.08); }
+  .nav .ic { width: 18px; height: 18px; border-radius: 5px; background: rgba(255,255,255,0.18); display:inline-block; }
+  .me {
+    margin-top: auto; padding: 12px; border-radius: 12px;
+    background: rgba(255,255,255,0.08); display: flex; align-items: center; gap: 10px;
+    font-size: 13px; color:#fff;
+  }
+  .avatar {
+    width: 34px; height: 34px; border-radius: 50%;
+    background: linear-gradient(135deg, #1464ff, #6aa0ff);
+    display: grid; place-items: center; font-weight: 700; color: #fff; font-size:13px;
+  }
+  .me small { color: #9db6dd; display: block; }
+
+  /* Main */
+  .main { padding: 24px 34px; overflow: hidden; display: flex; flex-direction: column; gap: 20px; }
+  .topbar { display: flex; align-items: center; justify-content: space-between; }
+  .greet h1 { font-size: 22px; font-weight: 700; color: var(--ink); }
+  .greet p { color: var(--muted); font-size: 13px; margin-top: 4px; }
+  .search {
+    background: var(--panel); border: 1px solid var(--border); border-radius: 12px;
+    padding: 10px 14px; width: 320px; color: var(--muted); font-size: 13px;
+  }
+  .iconbtn {
+    width: 40px; height: 40px; border-radius: 11px;
+    background: var(--panel); border: 1px solid var(--border);
+    display: grid; place-items: center; color: var(--brand);
+    position: relative; font-size: 16px;
+  }
+  .iconbtn .badge {
+    position: absolute; top: -5px; right: -5px;
+    width: 17px; height: 17px; border-radius: 50%;
+    background: var(--bad); color: white; font-size: 10px; font-weight: 700;
+    display: grid; place-items: center;
+    animation: pulse 1.8s ease-in-out infinite;
+  }
+  @keyframes pulse {
+    0%, 100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(214,67,91,0.6); }
+    50%      { transform: scale(1.12); box-shadow: 0 0 0 9px rgba(214,67,91,0); }
+  }
+
+  .grid { display: grid; grid-template-columns: 2.1fr 1fr; gap: 20px; flex: 1; min-height: 0; }
+  .col { display: flex; flex-direction: column; gap: 20px; min-height: 0; }
+
+  /* Balance hero */
+  .balance {
+    background:
+      radial-gradient(900px 240px at 110% -20%, rgba(20,100,255,0.35), transparent 60%),
+      linear-gradient(135deg, #072146 0%, #0b3a86 100%);
+    color: #fff;
+    border-radius: 18px; padding: 26px 28px; position: relative; overflow: hidden;
+  }
+  .balance .lbl { color: #aac6f3; font-size: 12px; letter-spacing: 0.08em; text-transform: uppercase; }
+  .balance .amt { font-size: 54px; font-weight: 300; letter-spacing: -0.02em; margin-top: 6px; font-feature-settings: "tnum"; }
+  .balance .amt small { font-size: 22px; color: #aac6f3; font-weight: 300; margin-left: 4px; }
+  .balance .iban { color: #aac6f3; font-size: 12px; margin-top: 10px; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+  .balance .row { display: flex; gap: 10px; margin-top: 22px; }
+  .balance .btn {
+    background: #fff; color: #072146; padding: 10px 16px; border-radius: 10px;
+    font-weight: 600; font-size: 13px; border: none; cursor: pointer;
+  }
+  .balance .btn.ghost { background: rgba(255,255,255,0.12); color: #fff; }
+
+  .cards-row { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 14px; }
+  .stat { background: var(--panel); border: 1px solid var(--border); border-radius: 14px; padding: 16px; }
+  .stat .l { color: var(--muted); font-size: 11px; letter-spacing: 0.06em; text-transform: uppercase; }
+  .stat .v { font-size: 21px; font-weight: 600; margin-top: 6px; font-feature-settings: "tnum"; color: var(--ink); }
+  .stat .d { color: var(--accent); font-size: 12px; margin-top: 4px; }
+  .stat .d.bad { color: var(--bad); }
+
+  .txns {
+    background: var(--panel); border: 1px solid var(--border); border-radius: 18px;
+    padding: 6px 4px 8px; flex: 1; min-height: 0; display: flex; flex-direction: column;
+  }
+  .txns h3 {
+    font-size: 14px; font-weight: 700; padding: 16px 24px 12px; color: var(--ink);
+    display: flex; justify-content: space-between; align-items: baseline;
+  }
+  .txns h3 a { color: var(--brand-2); font-size: 12px; text-decoration: none; font-weight: 600; }
+  .txn-list { overflow: auto; padding: 0 8px; }
+  .txn { display: grid; grid-template-columns: 40px 1fr auto auto; gap: 12px; align-items: center; padding: 11px 16px; border-radius: 12px; }
+  .txn:hover { background: var(--panel-hi); }
+  .txn .ic { width: 40px; height: 40px; border-radius: 11px; background: var(--chip); display: grid; place-items: center; font-size: 17px; }
+  .txn .who { font-size: 14px; font-weight: 500; color: var(--ink); }
+  .txn .when { color: var(--muted); font-size: 12px; margin-top: 2px; }
+  .txn .amt { font-feature-settings: "tnum"; font-weight: 600; color: var(--ink); }
+  .txn .amt.in { color: var(--accent); }
+  .txn .cat { color: var(--muted); font-size: 12px; padding: 3px 9px; background: var(--chip); border-radius: 7px; }
+
+  .card-mock {
+    background: linear-gradient(135deg, #0b3a86 0%, #061a39 100%);
+    border-radius: 18px; padding: 22px; height: 200px;
+    display: flex; flex-direction: column; justify-content: space-between;
+    position: relative; overflow: hidden; color: #fff;
+  }
+  .card-mock::after {
+    content: ""; position: absolute; right: -40px; top: -40px;
+    width: 220px; height: 220px; border-radius: 50%;
+    background: radial-gradient(circle, rgba(255,255,255,0.08), transparent 70%);
+  }
+  .card-mock .brand { font-size: 12px; letter-spacing: 0.2em; color: rgba(255,255,255,0.8); display:flex; align-items:center; gap:8px; }
+  .card-mock .chip { width: 34px; height: 24px; border-radius: 5px; background: linear-gradient(135deg,#e9c46a,#f4d58d); }
+  .card-mock .num { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; letter-spacing: 0.18em; font-size: 16px; }
+  .card-mock .meta { display: flex; justify-content: space-between; font-size: 12px; color: rgba(255,255,255,0.7); }
+  .card-mock .meta strong { color: white; font-weight: 600; letter-spacing: 0.06em; }
+
+  .insights {
+    background: var(--panel); border: 1px solid var(--border); border-radius: 18px;
+    padding: 18px 20px; flex: 1; min-height: 0; display: flex; flex-direction: column; gap: 11px;
+  }
+  .insights h3 { font-size: 14px; font-weight: 700; margin-bottom: 4px; color: var(--ink); }
+  .bar { display: grid; grid-template-columns: 92px 1fr auto; gap: 10px; align-items: center; font-size: 12px; color: var(--muted); }
+  .bar .fill { height: 7px; background: var(--chip); border-radius: 999px; overflow: hidden; }
+  .bar .fill > i { display: block; height: 100%; background: linear-gradient(90deg, var(--brand-2), #6aa0ff); border-radius: 999px; }
+  .bar .v { color: var(--ink); font-feature-settings: "tnum"; font-weight: 600; }
+
+  .footer-note { text-align: center; color: var(--muted); font-size: 10px; letter-spacing: 0.06em; padding: 2px 0; opacity: 0.7; }
+</style>
+</head>
+<body>
+<div class="app">
+
+  <!-- Sidebar -->
+  <aside class="side">
+    <div class="logo">
+      <!-- Fictional "Aurora" mark: a rising-sun arc -->
+      <svg class="mark" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <rect width="48" height="48" rx="10" fill="#1464ff"/>
+        <path d="M10 32a14 14 0 0 1 28 0" stroke="#ffffff" stroke-width="3.4" stroke-linecap="round"/>
+        <path d="M16 32a8 8 0 0 1 16 0" stroke="#9fc2ff" stroke-width="3" stroke-linecap="round"/>
+        <circle cx="24" cy="32" r="2.6" fill="#ffffff"/>
+      </svg>
+      <div>Banco&nbsp;Aurora<small>BANCA ONLINE</small></div>
+    </div>
+    <nav class="nav">
+      <a class="active"><span class="ic"></span> Resumen</a>
+      <a><span class="ic"></span> Cuentas</a>
+      <a><span class="ic"></span> Tarjetas</a>
+      <a><span class="ic"></span> Transferencias</a>
+      <a><span class="ic"></span> Inversiones</a>
+      <a><span class="ic"></span> Préstamos</a>
+      <a><span class="ic"></span> Ajustes</a>
+    </nav>
+    <div class="me">
+      <div class="avatar">MR</div>
+      <div>
+        María Ruiz
+        <small>Cuenta personal</small>
+      </div>
+    </div>
+  </aside>
+
+  <!-- Main -->
+  <main class="main">
+
+    <div class="topbar">
+      <div class="greet">
+        <h1>Buenas tardes, María 👋</h1>
+        <p>Tienes <strong style="color:var(--ink)">3 transferencias</strong> pendientes de aprobar.</p>
+      </div>
+      <div style="display:flex; gap:12px; align-items:center;">
+        <div class="search">🔎 &nbsp; Buscar movimientos, beneficiarios…</div>
+        <div class="iconbtn">🔔<span class="badge">3</span></div>
+        <div class="iconbtn">⚙️</div>
+      </div>
+    </div>
+
+    <div class="grid">
+
+      <!-- Left column -->
+      <div class="col">
+
+        <section class="balance">
+          <div class="lbl">Saldo disponible</div>
+          <div class="amt">1.283.407<small>,42 €</small></div>
+          <div class="iban">IBAN&nbsp;&nbsp;ES00 0000 0000 0000 0000 0042 &nbsp;·&nbsp; Cuenta corriente</div>
+          <div class="row">
+            <button class="btn">Enviar dinero</button>
+            <button class="btn ghost">Solicitar</button>
+            <button class="btn ghost">Recargar</button>
+            <button class="btn ghost">Extracto</button>
+          </div>
+        </section>
+
+        <div class="cards-row">
+          <div class="stat">
+            <div class="l">Gasto del mes</div>
+            <div class="v">4.219,07 €</div>
+            <div class="d bad">↑ 12,4% vs. mes anterior</div>
+          </div>
+          <div class="stat">
+            <div class="l">Ahorro</div>
+            <div class="v">87.420,00 €</div>
+            <div class="d">↑ 2.114 € este mes</div>
+          </div>
+          <div class="stat">
+            <div class="l">Pendiente</div>
+            <div class="v" style="color:var(--bad)">3 transferencias</div>
+            <div class="d bad">requiere acción</div>
+          </div>
+        </div>
+
+        <section class="txns">
+          <h3>Movimientos recientes <a href="#">Ver todos →</a></h3>
+          <div class="txn-list">
+            <div class="txn">
+              <div class="ic">💳</div>
+              <div><div class="who">Mercadona</div><div class="when">Hoy · 18:42</div></div>
+              <div class="cat">Supermercado</div>
+              <div class="amt">−47,80 €</div>
+            </div>
+            <div class="txn">
+              <div class="ic">⛽</div>
+              <div><div class="who">Repsol — Estación de servicio</div><div class="when">Hoy · 14:08</div></div>
+              <div class="cat">Transporte</div>
+              <div class="amt">−62,50 €</div>
+            </div>
+            <div class="txn">
+              <div class="ic">📱</div>
+              <div><div class="who">Movistar — Cuota mensual</div><div class="when">Hoy · 09:30</div></div>
+              <div class="cat">Servicios</div>
+              <div class="amt">−39,99 €</div>
+            </div>
+            <div class="txn">
+              <div class="ic">🍽️</div>
+              <div><div class="who">Restaurante La Viña</div><div class="when">Ayer · 22:11</div></div>
+              <div class="cat">Restauración</div>
+              <div class="amt">−74,20 €</div>
+            </div>
+            <div class="txn">
+              <div class="ic">🛒</div>
+              <div><div class="who">Amazon ES</div><div class="when">Ayer · 16:14</div></div>
+              <div class="cat">Compras</div>
+              <div class="amt">−128,40 €</div>
+            </div>
+            <div class="txn">
+              <div class="ic">💼</div>
+              <div><div class="who">Nómina — Empresa S.L.</div><div class="when">Dom · 08:00</div></div>
+              <div class="cat">Ingreso</div>
+              <div class="amt in">+2.840,00 €</div>
+            </div>
+            <div class="txn">
+              <div class="ic">🏠</div>
+              <div><div class="who">Alquiler — Vivienda</div><div class="when">Sáb · 10:00</div></div>
+              <div class="cat">Vivienda</div>
+              <div class="amt">−950,00 €</div>
+            </div>
+            <div class="txn">
+              <div class="ic">☕</div>
+              <div><div class="who">Cafetería Central</div><div class="when">Sáb · 09:21</div></div>
+              <div class="cat">Ocio</div>
+              <div class="amt">−3,40 €</div>
+            </div>
+            <div class="txn">
+              <div class="ic">⚡</div>
+              <div><div class="who">Iberdrola — Factura de luz</div><div class="when">Vie · 12:00</div></div>
+              <div class="cat">Suministros</div>
+              <div class="amt">−81,15 €</div>
+            </div>
+            <div class="txn">
+              <div class="ic">🚇</div>
+              <div><div class="who">Abono transporte</div><div class="when">Vie · 08:02</div></div>
+              <div class="cat">Transporte</div>
+              <div class="amt">−54,60 €</div>
+            </div>
+          </div>
+        </section>
+      </div>
+
+      <!-- Right column -->
+      <div class="col">
+
+        <div class="card-mock">
+          <div class="brand"><span class="chip"></span> AURORA · PLATINUM</div>
+          <div class="num">5412&nbsp;&nbsp;75••&nbsp;&nbsp;••••&nbsp;&nbsp;3008</div>
+          <div class="meta">
+            <div>
+              <div style="color:rgba(255,255,255,0.5); font-size:10px;">TITULAR</div>
+              <strong>MARÍA RUIZ</strong>
+            </div>
+            <div>
+              <div style="color:rgba(255,255,255,0.5); font-size:10px;">CADUCA</div>
+              <strong>09/28</strong>
+            </div>
+            <div style="font-size:16px; font-weight:700;">VISA</div>
+          </div>
+        </div>
+
+        <section class="insights">
+          <h3>Categorías este mes</h3>
+          <div class="bar"><span>🛒 Supermercado</span><span class="fill"><i style="width:82%"></i></span><span class="v">918 €</span></div>
+          <div class="bar"><span>🍽️ Restauración</span><span class="fill"><i style="width:64%"></i></span><span class="v">742 €</span></div>
+          <div class="bar"><span>⛽ Transporte</span><span class="fill"><i style="width:54%"></i></span><span class="v">598 €</span></div>
+          <div class="bar"><span>⚡ Suministros</span><span class="fill"><i style="width:41%"></i></span><span class="v">421 €</span></div>
+          <div class="bar"><span>🛍️ Compras</span><span class="fill"><i style="width:26%"></i></span><span class="v">266 €</span></div>
+          <div class="bar"><span>🎬 Ocio</span><span class="fill"><i style="width:15%"></i></span><span class="v">152 €</span></div>
+
+          <div class="footer-note" style="margin-top:auto;">
+            Entidad ficticia · demo
+          </div>
+        </section>
+
+      </div>
+
+    </div>
+  </main>
+
+</div>
+</body>
+</html>
